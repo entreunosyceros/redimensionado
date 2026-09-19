@@ -1,5 +1,9 @@
 # reDIMENSIONado
 
+<p align="center">
+<img width="1182" height="855" alt="logo" src="https://github.com/user-attachments/assets/5edcda50-a3ad-49e7-b619-f3b826610505" />
+</p>
+
 **reDIMENSIONado** redimensiona, recorta y convierte imágenes para publicar en web, desde el menú contextual de **Nautilus** (Archivos) en Ubuntu / GNOME.
 
 Versión del paquete: **2.0.0**
