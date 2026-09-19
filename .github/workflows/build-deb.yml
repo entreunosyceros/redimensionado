@@ -1,0 +1,41 @@
+name: Build .deb
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y imagemagick dpkg-dev zenity
+
+      - name: Run tests
+        run: |
+          chmod +x tests/test_redimensionado.sh scripts/* lib/*.sh build-deb.sh
+          ./tests/test_redimensionado.sh
+
+      - name: Build package
+        run: ./build-deb.sh
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: redimensionado-deb
+          path: dist/*.deb
+
+      - name: Publish release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# =============================================================================
+# reDIMENSIONado — Preferencias
+# -----------------------------------------------------------------------------
+# Edita ~/.config/redimensionado/config mediante un formulario Zenity.
+# =============================================================================
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -f /usr/share/redimensionado/lib/redimensionado-common.sh ]; then
+  # shellcheck disable=SC1091
+  source /usr/share/redimensionado/lib/redimensionado-common.sh
+else
+  # shellcheck disable=SC1091
+  source "$ROOT/lib/redimensionado-common.sh"
+fi
+
+rd_load_config
+rd_zenity_opts
+
+FORM=$(zenity "${RD_ZENITY_OPTS[@]}" --forms \
+  --title="$RD_APP_NAME — Preferencias" \
+  --text="Valores por defecto para acciones rápidas y la interfaz:" \
+  --add-entry="Ancho por defecto" \
+  --add-combo="Formato" --combo-values="keep|jpg|png|webp|avif" \
+  --add-combo="Calidad" --combo-values="60|75|85|95" \
+  --add-combo="Modo tamaño" --combo-values="exact|shrink_only" \
+  --add-combo="Recorte" --combo-values="none|1:1|16:9|4:3|og" \
+  --add-combo="Salida" --combo-values="copy|replace" \
+  --add-combo="Quitar EXIF" --combo-values="true|false" \
+  --add-entry="Sufijo ({W}=ancho)" \
+  --add-entry="Carpeta salida" \
+  --add-entry="Máx. KB (0=off)" \
+  --add-combo="Notificar" --combo-values="true|false" \
+  --add-combo="Abrir resultado" --combo-values="ask|always|never" \
+  --add-combo="Barra progreso" --combo-values="true|false") || exit 0
+
+IFS='|' read -r W F Q M C O S SUF OD MK N OP PR <<< "$FORM"
+
+[ -n "$W" ] && RD_WIDTH="$W"
+[ -n "$F" ] && RD_FORMAT="$F"
+[ -n "$Q" ] && RD_QUALITY="$Q"
+[ -n "$M" ] && RD_RESIZE_MODE="$M"
+[ -n "$C" ] && RD_CROP="$C"
+[ -n "$O" ] && RD_OUTPUT_MODE="$O"
+[ -n "$S" ] && RD_STRIP="$S"
+[ -n "$SUF" ] && RD_SUFFIX="$SUF"
+RD_OUTDIR="${OD:-}"
+[ -n "$MK" ] && RD_MAX_KB="$MK"
+[ -n "$N" ] && RD_NOTIFY="$N"
+[ -n "$OP" ] && RD_OPEN_RESULT="$OP"
+[ -n "$PR" ] && RD_SHOW_PROGRESS="$PR"
+
+rd_save_config
+zenity "${RD_ZENITY_OPTS[@]}" --info --title="$RD_APP_NAME" \
+  --text="Preferencias guardadas en:\n$RD_CONFIG_FILE" --timeout=4

@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# =============================================================================
+# reDIMENSIONado — interfaz completa (Zenity)
+# -----------------------------------------------------------------------------
+# Diálogo con presets, formato, calidad, recorte, modo de salida, etc.
+# Aparece en Scripts / menú de la extensión Nautilus.
+# =============================================================================
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Cuando está instalado por .deb:
+if [ -f /usr/share/redimensionado/lib/redimensionado-common.sh ]; then
+  # shellcheck disable=SC1091
+  source /usr/share/redimensionado/lib/redimensionado-common.sh
+elif [ -f "$ROOT/lib/redimensionado-common.sh" ]; then
+  # shellcheck disable=SC1091
+  source "$ROOT/lib/redimensionado-common.sh"
+else
+  echo "No se encuentra redimensionado-common.sh" >&2
+  exit 1
+fi
+
+rd_load_config
+rd_zenity_opts
+
+if ! command -v zenity >/dev/null 2>&1; then
+  echo "Falta zenity" >&2
+  exit 1
+fi
+if ! rd_init_imagemagick; then
+  zenity "${RD_ZENITY_OPTS[@]}" --error --title="$RD_APP_NAME" \
+    --text="Falta ImageMagick (apt install imagemagick)"
+  exit 1
+fi
+
+rd_files_from_nautilus
+if [ "${#RD_FILES[@]}" -eq 0 ]; then
+  # Permitir pasar ficheros por argumentos (tests / extensión)
+  RD_FILES=("$@")
+fi
+if [ "${#RD_FILES[@]}" -eq 0 ]; then
+  zenity "${RD_ZENITY_OPTS[@]}" --error --title="$RD_APP_NAME" \
+    --text="No hay archivos seleccionados."
+  exit 1
+fi
+
+# --- Paso 1: preset o ancho ---
+PRESET=$(zenity "${RD_ZENITY_OPTS[@]}" --list \
+  --title="$RD_APP_NAME" \
+  --text="Elige un preset o un ancho libre:" \
+  --radiolist \
+  --column="" --column="Opción" --column="Detalle" \
+  TRUE  "1200" "Web estándar (1200 px)" \
+  FALSE "800" "Blog (800 px)" \
+  FALSE "640" "Miniatura (640 px)" \
+  FALSE "1600" "Retina (1600 px)" \
+  FALSE "1920" "Full HD / hero (1920 px)" \
+  FALSE "instagram" "Instagram 1080 (cuadrado 1:1)" \
+  FALSE "og" "Open Graph 1200×630" \
+  FALSE "favicon" "Favicon 32×32 PNG" \
+  FALSE "custom" "Ancho personalizado…" \
+  --height=420 --width=480) || exit 0
+
+[ -z "$PRESET" ] && exit 0
+
+if [ "$PRESET" = "custom" ]; then
+  CUSTOM=$(zenity "${RD_ZENITY_OPTS[@]}" --entry \
+    --title="$RD_APP_NAME" \
+    --text="Ancho en píxeles:" \
+    --entry-text="$RD_WIDTH") || exit 0
+  [[ "$CUSTOM" =~ ^[0-9]+$ ]] || {
+    zenity "${RD_ZENITY_OPTS[@]}" --error --text="Ancho no válido."
+    exit 1
+  }
+  RD_WIDTH="$CUSTOM"
+  RD_CROP="none"
+else
+  rd_preset_width "$PRESET"
+fi
+
+# --- Paso 2: opciones avanzadas (valores por defecto desde config) ---
+FORM=$(zenity "${RD_ZENITY_OPTS[@]}" --forms \
+  --title="$RD_APP_NAME — opciones" \
+  --text="Ajusta formato, calidad y salida:" \
+  --add-combo="Formato" --combo-values="keep|jpg|png|webp|avif" \
+  --add-combo="Calidad" --combo-values="60|75|85|95" \
+  --add-combo="Modo tamaño" --combo-values="exact|shrink_only" \
+  --add-combo="Recorte" --combo-values="none|1:1|16:9|4:3|og" \
+  --add-combo="Salida" --combo-values="copy|replace" \
+  --add-combo="Quitar EXIF" --combo-values="true|false" \
+  --add-entry="Sufijo ({W}=ancho)" \
+  --add-entry="Carpeta salida (vacío=misma)" \
+  --add-entry="Máx. KB (0=sin límite)") || exit 0
+
+IFS='|' read -r F_FORMAT F_QUALITY F_MODE F_CROP F_OUT F_STRIP F_SUFFIX F_OUTDIR F_MAXKB <<< "$FORM"
+
+[ -n "$F_FORMAT" ] && RD_FORMAT="$F_FORMAT"
+[ -n "$F_QUALITY" ] && RD_QUALITY="$F_QUALITY"
+[ -n "$F_MODE" ] && RD_RESIZE_MODE="$F_MODE"
+# Si el preset ya fijó crop (instagram/og/favicon), solo sobrescribir si el usuario eligió otro
+if [ -n "$F_CROP" ]; then
+  case "$PRESET" in
+    instagram|og|favicon) ;;
+    *) RD_CROP="$F_CROP" ;;
+  esac
+  # Si eligió custom/ancho y eligió crop en el form, aplicarlo
+  case "$PRESET" in
+    instagram|og|favicon) ;;
+    *) [ -n "$F_CROP" ] && RD_CROP="$F_CROP" ;;
+  esac
+fi
+[ -n "$F_OUT" ] && RD_OUTPUT_MODE="$F_OUT"
+[ -n "$F_STRIP" ] && RD_STRIP="$F_STRIP"
+[ -n "$F_SUFFIX" ] && RD_SUFFIX="$F_SUFFIX"
+# Carpeta puede ser vacía a propósito
+RD_OUTDIR="${F_OUTDIR:-}"
+[ -n "$F_MAXKB" ] && RD_MAX_KB="$F_MAXKB"
+
+# Confirmación si se va a reemplazar
+if [ "$RD_OUTPUT_MODE" = "replace" ]; then
+  zenity "${RD_ZENITY_OPTS[@]}" --question --title="$RD_APP_NAME" \
+    --text="Vas a SOBRESCRIBIR los originales.\n¿Continuar?" \
+    --ok-label="Sobrescribir" --cancel-label="Cancelar" || exit 0
+fi
+
+rd_process_files "${RD_FILES[@]}"
+rd_show_summary

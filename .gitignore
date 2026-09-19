@@ -1,0 +1,31 @@
+# Empaquetado Debian (se regeneran con ./build-deb.sh)
+/build/
+/dist/
+*.deb
+
+# Preferencias y logs locales del usuario (no versionar)
+.config/
+*.log
+
+# Cachés y temporales del sistema / editores
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.code-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Temporales de pruebas
+/tmp-test/
+*.bak
+*.tmp

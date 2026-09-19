@@ -1,0 +1,14 @@
+# Copia a ~/.config/redimensionado/config o usa Preferencias en el menú
+default_width=1200
+format=keep
+quality=85
+resize_mode=exact
+crop=none
+strip_exif=true
+output_mode=copy
+suffix=_web{W}
+output_dir=
+max_kb=0
+notify=true
+open_result=ask
+show_progress=true

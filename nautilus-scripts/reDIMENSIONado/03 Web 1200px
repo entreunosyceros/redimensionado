@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec /usr/share/redimensionado/scripts/reDIMENSIONado-rapido.sh "1200" "$@"
